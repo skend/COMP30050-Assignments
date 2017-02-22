@@ -11,7 +11,7 @@ public class DeckOfCards {
 		DeckOfCards test = new DeckOfCards();
 
 		// Deal 52 cards and return them.
-		for (int i = 0; i < 52; i++) {
+		for (int i = 0; i < DECK_SIZE; i++) {
 			PlayingCard card = test.dealNext();
 			System.out.println(card);
 			test.returnCard(card);
@@ -49,7 +49,7 @@ public class DeckOfCards {
 		int suitTrack = 0;
 
 		// Create each card in the deck and add them to the deck ArrayList.
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < suits.length; i++) {
 			char currentSuit = suits[suitTrack++];
 			for (int j = 2; j < 11; j++) {
 				deck.add(new PlayingCard("" + j, currentSuit, j, j));
@@ -69,15 +69,15 @@ public class DeckOfCards {
 		Random rand = new Random();
 
 		for (int i = 0; i < 10000; i++) {
-			int rand1 = rand.nextInt((51 - 0) + 1) + 0;
-			int rand2 = rand.nextInt((51 - 0) + 1) + 0;
+			int rand1 = rand.nextInt((DECK_SIZE - 1) + 1);
+			int rand2 = rand.nextInt((DECK_SIZE - 1) + 1);
 			Collections.swap(this.deck, rand1, rand2);
 		}
 	}
 
 	// Remove the card from the top of the deck and return it (to a player).
 	public PlayingCard dealNext() {
-		if (numCardsDealt >= 52)
+		if (numCardsDealt >= DECK_SIZE)
 			return null;
 
 		PlayingCard card = null;
@@ -95,9 +95,11 @@ public class DeckOfCards {
 
 	// Return a card (from a hand/discarded) to the deck.
 	public void returnCard(PlayingCard card) {
+		if (card == null) return;
 		deck.add(card);
 	}
-
+	
+	private static final int DECK_SIZE = 52;
 	private int numCardsDealt;
 	private List<PlayingCard> deck;
 }
