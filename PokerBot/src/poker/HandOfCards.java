@@ -5,11 +5,13 @@ import java.util.Collections;
 import java.util.Comparator;
 
 public class HandOfCards {
-	
+
 	/*
-	 * The maximum value a hand subtracted from the previous tier's default value
-	 * is approximately 570,000. The default value intervals are 1,000,000 in order
-	 * to clearly separate each type of hand which makes testing easier. 
+	 * The maximum value a hand can be, subtracted from the previous tier's
+	 * default value, is approximately 570,000. Since this isn't a round number,
+	 * I have set the default value intervals at 1,000,000 in order to avoid
+	 * interval values such as 1,970,000. Having round numbers makes it much
+	 * clearer which tier a hand belongs to.
 	 */
 	private static final int HIGH_CARD_DEFAULT = 0;
 	private static final int ONE_PAIR_DEFAULT = 1000000;
@@ -23,7 +25,7 @@ public class HandOfCards {
 	private static final int ROYAL_FLUSH_DEFAULT = 9000000;
 
 	private ArrayList<PlayingCard> hand;
-	private static final int HAND_SIZE = 5;
+	public static final int HAND_SIZE = 5;
 	private DeckOfCards deck;
 
 	public HandOfCards(DeckOfCards d) {
@@ -68,14 +70,14 @@ public class HandOfCards {
 	 */
 	private boolean isRun() {
 		boolean lowValueRun = false;
-		if (hand.get(0).getGameValue() == 14 && hand.get(4).getGameValue() == 2)
+		if (hand.get(0).getGameValue() == PlayingCard.ACE_GAME_VALUE && hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE)
 			lowValueRun = true;
 
 		if (lowValueRun) {
 			return ((hand.get(1).getGameValue() - hand.get(2).getGameValue())
 					* (hand.get(2).getGameValue() - hand.get(3).getGameValue())
 					* (hand.get(3).getGameValue() - hand.get(4).getGameValue()) == 1)
-					&& hand.get(4).getGameValue() == 2;
+					&& hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE;
 		} else {
 			return ((hand.get(0).getGameValue() - hand.get(1).getGameValue())
 					* (hand.get(1).getGameValue() - hand.get(2).getGameValue())
@@ -91,155 +93,177 @@ public class HandOfCards {
 				&& (hand.get(0).getSuit() == hand.get(4).getSuit()));
 	}
 
+	private int getHighHandValue() {
+		int handValue = HandOfCards.HIGH_CARD_DEFAULT;
+		handValue += Math.pow(hand.get(0).getGameValue(), 5);
+		handValue += Math.pow(hand.get(1).getGameValue(), 4);
+		handValue += Math.pow(hand.get(2).getGameValue(), 3);
+		handValue += Math.pow(hand.get(3).getGameValue(), 2);
+		handValue += hand.get(0).getGameValue();
+		return handValue;
+	}
+
+	// Weight the pair, then high card, then next highest card and so on.
+	private int getOnePairValue() {
+		// Find the index where the pair begins in the hand.
+		// Initialise the hand value at the one pair default value.
+		int handValue = HandOfCards.ONE_PAIR_DEFAULT;
+		int pairIndex = findPairStartIndex(0);
+
+		// Since the hand is sorted, the positions of the high cards are known.
+		if (pairIndex == 0) {
+			handValue += Math.pow(hand.get(1).getGameValue(), 3);
+			handValue += Math.pow(hand.get(2).getGameValue(), 2);
+			handValue += hand.get(3).getGameValue();
+		} else if (pairIndex == 1) {
+			handValue += Math.pow(hand.get(0).getGameValue(), 3);
+			handValue += Math.pow(hand.get(3).getGameValue(), 2);
+			handValue += hand.get(4).getGameValue();
+		} else if (pairIndex == 2) {
+			handValue += Math.pow(hand.get(0).getGameValue(), 3);
+			handValue += Math.pow(hand.get(1).getGameValue(), 2);
+			handValue += hand.get(4).getGameValue();
+		} else if (pairIndex == 3) {
+			handValue += Math.pow(hand.get(0).getGameValue(), 3);
+			handValue += Math.pow(hand.get(1).getGameValue(), 2);
+			handValue += hand.get(2).getGameValue();
+		}
+
+		handValue += Math.pow(hand.get(pairIndex).getGameValue(), 5);
+		return handValue;
+	}
+
+	// Weight the highest value pair, then the other pair, then the kicker
+	// (remaining card).
+	private int getTwoPairValue() {
+		// Initialise the hand value to the two pair default value.
+		// Find the indexes of each pair in the hand.
+		int handValue = HandOfCards.TWO_PAIR_DEFAULT;
+		int index1 = findPairStartIndex(0);
+		int index2 = findPairStartIndex(index1 + 1);
+
+		// Add the value of the kicker to the hand value.
+		if (index1 == 0 && index2 == 3) {
+			handValue += hand.get(2).getGameValue();
+		} else if (index1 == 1 && index2 == 3) {
+			handValue += hand.get(0).getGameValue();
+		} else if (index1 == 0 && index2 == 2) {
+			handValue += hand.get(4).getGameValue();
+		}
+
+		// Add the value of the greatest pair to the power of 4.
+		// Add the value of the second greatest pair to the power of 3.
+		handValue += Math.pow(hand.get(index1).getGameValue(), 4);
+		handValue += Math.pow(hand.get(index2).getGameValue(), 3);
+		return handValue;
+	}
+
+	// Get the highest value card in the straight and add it to the default
+	// value.
+	private int getStraightValue() {
+		int handValue = 0;
+
+		// If the hand contains an ace - determine whether it is an ace low
+		// or ace high.
+		// If it is an ace low, then get the next highest card in the hand.
+		if (hand.get(0).getGameValue() == PlayingCard.ACE_GAME_VALUE) {
+			if (hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE) {
+				handValue = 4;
+			} else {
+				handValue = 14;
+			}
+		} else {
+			handValue = hand.get(0).getGameValue();
+		}
+
+		return handValue + HandOfCards.STRAIGHT_DEFAULT;
+	}
+
+	// Weight the three of a kind over the two pair.
+	private int getFullHouseValue() {
+		boolean threeOfAKindAtStart = false;
+		int handValue = FULL_HOUSE_DEFAULT;
+
+		if (hand.get(0).getGameValue() == hand.get(2).getGameValue()) {
+			threeOfAKindAtStart = true;
+		}
+
+		if (threeOfAKindAtStart) {
+			handValue += Math.pow(hand.get(0).getGameValue(), 3) + Math.pow(hand.get(3).getGameValue(), 2);
+		} else {
+			handValue += Math.pow(hand.get(2).getGameValue(), 3) + Math.pow(hand.get(0).getGameValue(), 2);
+		}
+
+		return handValue;
+	}
+
+	// Add the highest card in the straight to the default value.
+	private int getStraightFlushValue() {
+		boolean containsAce = false;
+		int handValue = 0;
+
+		if (hand.get(0).getGameValue() == PlayingCard.ACE_GAME_VALUE) {
+			containsAce = true;
+		}
+
+		if (containsAce) {
+			if (hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE) {
+				handValue = 4;
+			} else {
+				handValue = 14;
+			}
+		} else {
+			handValue = hand.get(0).getGameValue();
+		}
+
+		return handValue + HandOfCards.STRAIGHT_FLUSH_DEFAULT;
+	}
+
 	public int getGameValue() {
 		// Weight the highest card over the next highest card and so on.
 		if (isHighHand()) {
-			int handValue = HandOfCards.HIGH_CARD_DEFAULT;
-			handValue += Math.pow(hand.get(0).getGameValue(), 5);
-			handValue += Math.pow(hand.get(1).getGameValue(), 4);
-			handValue += Math.pow(hand.get(2).getGameValue(), 3);
-			handValue += Math.pow(hand.get(3).getGameValue(), 2);
-			handValue += hand.get(0).getGameValue();
-			return handValue;
+			return getHighHandValue();
 		}
 
-		// Weight the pair, then high card, then next highest card and so on.
 		if (isOnePair()) {
-			// Find the index where the pair begins in the hand.
-			// Initialise the hand value at the one pair default value.
-			int handValue = HandOfCards.ONE_PAIR_DEFAULT;
-			int pairIndex = findPairStartIndex(0);
-
-			// Since the hand is sorted, the positions of the high cards are known.
-			if (pairIndex == 0) {
-				handValue += Math.pow(hand.get(1).getGameValue(), 3);
-				handValue += Math.pow(hand.get(2).getGameValue(), 2);
-				handValue += hand.get(3).getGameValue();
-			} else if (pairIndex == 1) {
-				handValue += Math.pow(hand.get(0).getGameValue(), 3);
-				handValue += Math.pow(hand.get(3).getGameValue(), 2);
-				handValue += hand.get(4).getGameValue();
-			} else if (pairIndex == 2) {
-				handValue += Math.pow(hand.get(0).getGameValue(), 3);
-				handValue += Math.pow(hand.get(1).getGameValue(), 2);
-				handValue += hand.get(4).getGameValue();
-			} else if (pairIndex == 3) {
-				handValue += Math.pow(hand.get(0).getGameValue(), 3);
-				handValue += Math.pow(hand.get(1).getGameValue(), 2);
-				handValue += hand.get(2).getGameValue();
-			}
-
-			handValue += Math.pow(hand.get(pairIndex).getGameValue(), 5);
-			return handValue;
+			return getOnePairValue();
 		}
 
-		// Weight the highest value pair, then the other pair, then the kicker (remaining card).
 		if (isTwoPair()) {
-			// Initialise the hand value to the two pair default value.
-			// Find the indexes of each pair in the hand.
-			int handValue = HandOfCards.TWO_PAIR_DEFAULT;
-			int index1 = findPairStartIndex(0);
-			int index2 = findPairStartIndex(index1 + 1);
-
-			// Add the value of the kicker to the hand value.
-			if (index1 == 0 && index2 == 3) {
-				handValue += hand.get(2).getGameValue();
-			} else if (index1 == 1 && index2 == 3) {
-				handValue += hand.get(0).getGameValue();
-			} else if (index1 == 0 && index2 == 2) {
-				handValue += hand.get(4).getGameValue();
-			}
-			
-			// Add the value of the greatest pair to the power of 4.
-			// Add the value of the second greatest pair to the power of 3.
-			handValue += Math.pow(hand.get(index1).getGameValue(), 4);
-			handValue += Math.pow(hand.get(index2).getGameValue(), 3);
-			return handValue;
+			return getTwoPairValue();
 		}
-		
+
 		// Adds the card value of the three of a kind to the default value.
 		if (isThreeOfAKind()) {
 			int index = findPairStartIndex(0);
 			return hand.get(index).getGameValue() + HandOfCards.THREE_OF_A_KIND_DEFAULT;
 		}
-		
+
 		// Adds the card value of the four of a kind to the default value.
 		if (isFourOfAKind()) {
 			int index = findPairStartIndex(0);
 			return hand.get(index).getGameValue() + HandOfCards.FOUR_OF_A_KIND_DEFAULT;
 		}
-		
-		// Get the highest value card in the straight and add it to the default value.
+
 		if (isStraight()) {
-			int handValue = 0;
-			
-			// If the hand contains an ace - determine whether it is an ace low or ace high.
-			// If it is an ace low, then get the next highest card in the hand.
-			if (hand.get(0).getGameValue() == 14) {
-				if (hand.get(4).getGameValue() == 2) {
-					handValue = 4;
-				} else {
-					handValue = 14;
-				}
-			} else {
-				handValue = hand.get(0).getGameValue();
-			}
-
-			return handValue + HandOfCards.STRAIGHT_DEFAULT;
+			return getStraightValue();
 		}
-		
-		// The same principle as high hand. 
+
+		// The same principle as high hand.
 		if (isFlush()) {
-			int handValue = HandOfCards.FLUSH_DEFAULT;
-			handValue += Math.pow(hand.get(0).getGameValue(), 5);
-			handValue += Math.pow(hand.get(1).getGameValue(), 4);
-			handValue += Math.pow(hand.get(2).getGameValue(), 3);
-			handValue += Math.pow(hand.get(3).getGameValue(), 2);
-			handValue += hand.get(0).getGameValue();
-			return handValue;
+			return HandOfCards.FLUSH_DEFAULT + getHighHandValue();
 		}
-		
-		// Weight the three of a kind over the two pair. 
+
 		if (isFullHouse()) {
-			boolean threeOfAKindAtStart = false;
-			int handValue = FULL_HOUSE_DEFAULT;
-
-			if (hand.get(0).getGameValue() == hand.get(2).getGameValue()) {
-				threeOfAKindAtStart = true;
-			}
-
-			if (threeOfAKindAtStart) {
-				handValue += Math.pow(hand.get(0).getGameValue(), 3) + Math.pow(hand.get(3).getGameValue(), 2);
-			} else {
-				handValue += Math.pow(hand.get(2).getGameValue(), 3) + Math.pow(hand.get(0).getGameValue(), 2);
-			}
-
-			return handValue;
+			return getFullHouseValue();
 		}
-		
-		// Add the highest card in the straight to the default value.
+
 		if (isStraightFlush()) {
-			boolean containsAce = false;
-			int handValue = 0;
-
-			if (hand.get(0).getGameValue() == 14) {
-				containsAce = true;
-			}
-
-			if (containsAce) {
-				if (hand.get(4).getGameValue() == 2) {
-					handValue = 4;
-				} else {
-					handValue = 14;
-				}
-			} else {
-				handValue = hand.get(0).getGameValue();
-			}
-
-			return handValue + HandOfCards.STRAIGHT_FLUSH_DEFAULT;
+			return getStraightFlushValue();
 		}
-		
-		// All royal flushes are the same (disregarding suit) so just add 10,000 to the default value.
+
+		// All royal flushes are the same (disregarding suit) so just add 10,000
+		// to the default value.
 		if (isRoyalFlush()) {
 			return HandOfCards.ROYAL_FLUSH_DEFAULT + 10000;
 		}
@@ -365,9 +389,556 @@ public class HandOfCards {
 	 * order and of the same suit AND that the highest value card is an ace).
 	 */
 	public boolean isRoyalFlush() {
-		return sameSuit() && isRun() && hand.get(0).getGameValue() == 14;
+		return sameSuit() && isRun() && hand.get(0).getGameValue() == PlayingCard.ACE_GAME_VALUE;
 	}
 
+	private int findCardIndexInHandByGameValue(int gameValue, int offset) {
+		for (int i = offset; i < HAND_SIZE; i++) {
+			if (hand.get(i).getGameValue() == gameValue) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	
+	// Determine how close a hand is to becoming a straight.
+	private int determineProximityToStraight() {
+		int proximity = 4;
+		boolean containsAce = false;
+		int lastCardValue = hand.get(0).getGameValue();
+
+		if (lastCardValue == PlayingCard.ACE_GAME_VALUE)
+			containsAce = true;
+
+		// Edge case: determines if a hand is close to an ace low straight.
+		if (containsAce) {
+			if (hand.get(4).getGameValue() == 2 && hand.get(3).getGameValue() == 3 && hand.get(2).getGameValue() == 4) {
+				return 1;
+			} else if (hand.get(4).getGameValue() == 2 && hand.get(3).getGameValue() == 4
+					&& hand.get(2).getGameValue() == 5) {
+				return 1;
+			} else if (hand.get(4).getGameValue() == 3 && hand.get(3).getGameValue() == 4
+					&& hand.get(2).getGameValue() == 5) {
+				return 1;
+			}
+		}
+
+		for (int i = 1; i < HAND_SIZE; i++) {
+			if (findCardIndexInHandByGameValue(lastCardValue - 1, i) != -1) {
+				proximity--;
+			} else {
+				if (findCardIndexInHandByGameValue(lastCardValue - 2, i) != -1) {
+					proximity--;
+				}
+			}
+			if (lastCardValue - hand.get(i).getGameValue() > 3) {
+				if (proximity <= 2)
+					break;
+				else {
+					proximity++;
+					if (proximity > 4)
+						proximity = 4;
+				}
+			}
+			lastCardValue = hand.get(i).getGameValue();
+		}
+
+		return proximity;
+	}
+	
+	// Count the number of times a suit occurs in a hand.
+	// If the suit occurs 3 or more times then return a string of two characters, otherwise return null.
+	// The first characters represents the suit and the second character is a number representing the 
+	// number of times that suit occurs in the hand.
+	private String countSuitFrequency() {
+		int heartsFrequency = 0;
+		int diamondsFrequency = 0;
+		int clubsFrequency = 0;
+		int spadesFrequency = 0;
+		for (int i = 0; i < HAND_SIZE; i++) {
+			switch (hand.get(i).getSuit()) {
+			case PlayingCard.DIAMONDS:
+				diamondsFrequency++;
+				break;
+			case PlayingCard.HEARTS:
+				heartsFrequency++;
+				break;
+			case PlayingCard.SPADES:
+				spadesFrequency++;
+				break;
+			case PlayingCard.CLUBS:
+				clubsFrequency++;
+				break;
+			}
+		}
+
+		if (diamondsFrequency == 4 || diamondsFrequency == 3) {
+			return "" + PlayingCard.DIAMONDS + diamondsFrequency;
+		} else if (heartsFrequency == 4 || heartsFrequency == 3) {
+			return "" + PlayingCard.HEARTS + heartsFrequency;
+		} else if (clubsFrequency == 4 || clubsFrequency == 3) {
+			return "" + PlayingCard.CLUBS + clubsFrequency;
+		} else if (spadesFrequency == 4 || spadesFrequency == 3) {
+			return "" + PlayingCard.SPADES + spadesFrequency;
+		} else
+			return null;
+	}
+	
+	// Find which cards should be discarded in a broken straight.
+	// If the broken straight is one off a straight then the problem card should receive the oneOffProbability.
+	// If the broken straight is two off a straight then the problem card should receive the twoOffProbability.
+	private int findProblemCardsInBrokenStraight(int cardPosition, int oneOffProbability, int twoOffProbability) {
+		int straightProximity = determineProximityToStraight();
+		if (straightProximity <= 2) {
+			if (straightProximity == 1) {
+				int lastCardValue = hand.get(0).getGameValue();
+
+				int problemCardIndex = -1;
+				for (int i = 0; i < HAND_SIZE - 1; i++) {
+					if (!(findCardIndexInHandByGameValue(lastCardValue - 1, i + 1) != -1
+							|| findCardIndexInHandByGameValue(lastCardValue - 2, i + 1) != -1)) {
+						problemCardIndex = i + 1;
+						break;
+					}
+					lastCardValue = hand.get(i + 1).getGameValue();
+				}
+				if (problemCardIndex == cardPosition)
+					return oneOffProbability;
+				else
+					return 0;
+			} else if (straightProximity == 2) {
+				int firstHalfOfHandDifference = hand.get(0).getGameValue() - hand.get(1).getGameValue()
+						+ hand.get(1).getGameValue() - hand.get(2).getGameValue();
+				int secondHalfOfHandDifference = hand.get(2).getGameValue() - hand.get(3).getGameValue()
+						+ hand.get(3).getGameValue() - hand.get(4).getGameValue();
+
+				if (firstHalfOfHandDifference > secondHalfOfHandDifference) {
+					if (cardPosition == 0 || cardPosition == 1) {
+						return twoOffProbability;
+					} else
+						return 0;
+				} else {
+					if (cardPosition == 3 || cardPosition == 4) {
+						return twoOffProbability;
+					} else
+						return 0;
+				}
+			}
+			else return 0;
+		}
+		else return 0;
+	}
+	
+	// Find the cards in a high hand which should be discarded in order to potentially improve ones hand.
+	private int getHighHandDiscardProbability(int cardPosition) {
+		// High hand doesn't calculate odds of getting a better hand since the player should always attempt to obtain one.
+		String suitFrequency = countSuitFrequency();
+		
+		// Check if it is possible to obtain a flush from the current hand. If so then determine which
+		// cards should be discarded. Return a non-zero for these cards and 0 for the remaining cards.
+		if (suitFrequency != null) {
+			if (suitFrequency.equals("D4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+					return 85;
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("D3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+					return 55;
+				else
+					return 0;
+			}
+
+			if (suitFrequency.equals("C4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+					return 85;
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("C3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+					return 55;
+				else
+					return 0;
+			}
+
+			if (suitFrequency.equals("S4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+					return 85;
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("S3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+					return 55;
+				else
+					return 0;
+			}
+
+			if (suitFrequency.equals("H4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+					return 85;
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("H3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+					return 55;
+				else
+					return 0;
+			}
+		}
+		
+		
+		// Determine whether it is possible to obtain a straight from the current hand. If it is possible
+		// find the cards which should be discarded. Return a non-zero for these cards and zero for the other cards. 
+		int straightProximity = determineProximityToStraight();
+		if (straightProximity <= 2) {
+			// Not using calculations because a player with a high hand should 'always' go for something better.
+			return findProblemCardsInBrokenStraight(cardPosition, 80, 50);
+		}
+		else {
+			// If the hand is not close to a straight or a flush then discard the two lowest cards.
+			if (cardPosition == 3)
+				return 60;
+			if (cardPosition == 4)
+				return 90;
+		}
+
+		return 0;
+	}
+	
+	// Method to find which cards should be discarded (if any) if the hand is a one pair.
+	private int getOnePairDiscardProbability(int cardPosition) {
+		int straightProximity = determineProximityToStraight();
+		String suitFrequency = countSuitFrequency();
+		
+		if (straightProximity <= 2) {
+			// If the one pair is close to straight then occasionally sacrifice the pair.
+			return findProblemCardsInBrokenStraight(cardPosition, (int)(4.0/47.0 * 100 * 3), (int)(4.0/47.0 * 4.0/46.0 * 100 * 3));
+		}
+		else if (suitFrequency != null && (suitFrequency.charAt(1) == '4' || suitFrequency.charAt(1) == '3')) {
+			if (suitFrequency != null) {
+				if (suitFrequency.equals("D4")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+						return (int)(9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				} 
+				else if (suitFrequency.equals("D3")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				}
+
+				if (suitFrequency.equals("C4")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+						return (int)(9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				} 
+				else if (suitFrequency.equals("C3")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				}
+
+				if (suitFrequency.equals("S4")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+						return (int)(9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				} 
+				else if (suitFrequency.equals("S3")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				}
+
+				if (suitFrequency.equals("H4")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+						return (int)(9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				} 
+				else if (suitFrequency.equals("H3")) {
+					if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
+					else
+						return 0;
+				}
+			}
+		}
+		else {
+			// If the one pair is not close to a straight/flush then discard the two lowest non-pair cards.
+			int index = findPairStartIndex(0);
+
+			if (index == 0) {
+				if (cardPosition == 4) {
+					return 75;
+				} else if (cardPosition == 3) {
+					return 50;
+				} else {
+					return 0;
+				}
+			} 
+			else if (index == 1) {
+				if (cardPosition == 4) {
+					return 75;
+				} else if (cardPosition == 3) {
+					return 50;
+				} else {
+					return 0;
+				}
+			} 
+			else if (index == 2) {
+				if (cardPosition == 4) {
+					return 75;
+				} else if (cardPosition == 1) {
+					return 50;
+				} else {
+					return 0;
+				}
+			} 
+			else if (index == 3) {
+				if (cardPosition == 2) {
+					return 75;
+				} else if (cardPosition == 1) {
+					return 50;
+				} else {
+					return 0;
+				}
+			}
+			else return 0;
+		}
+		return 0;
+	}
+	
+	// Determine which cards should be discarded in a two pair. 
+	private int getTwoPairDiscardProbability(int cardPosition) {
+		String suitFrequency = countSuitFrequency();
+		// Check if it is possible to obtain a flush from the current hand. If so then determine which
+		// cards should be discarded. Return a non-zero for these cards and 0 for the remaining cards.
+		if (suitFrequency != null) {
+			if (suitFrequency.equals("D4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+					return (int)(9.0/47.0 * 100);
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("D3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+					return (int)(10.0/47.0 * 9.0/47.0 * 100);
+				else
+					return 0;
+			}
+
+			if (suitFrequency.equals("C4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+					return (int)(9.0/47.0 * 100);
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("C3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+					return (int)(10.0/47.0 * 9.0/47.0 * 100);
+				else
+					return 0;
+			}
+
+			if (suitFrequency.equals("S4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+					return (int)(9.0/47.0 * 100);
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("S3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+					return (int)(10.0/47.0 * 9.0/47.0 * 100);
+				else
+					return 0;
+			}
+
+			if (suitFrequency.equals("H4")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+					return (int)(9.0/47.0 * 100);
+				else
+					return 0;
+			} 
+			else if (suitFrequency.equals("H3")) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+					return (int)(10.0/47.0 * 9.0/47.0 * 100);
+				else
+					return 0;
+			}
+		}
+		else {
+			// Determine whether or not to discard non-pair card.
+			int index1 = findPairStartIndex(0);
+			int index2 = findPairStartIndex(index1 + 1);
+
+			if (cardPosition != index1 && cardPosition != index1 + 1 && cardPosition != index2
+					&& cardPosition != index2 + 1) {
+				// If the non-pair card is already higher than average, don't discard it.
+				if (hand.get(cardPosition).getGameValue() < 8)
+					return 75;
+				else
+					return 0;
+			} else {
+				return 0;
+			}
+		}
+		return 0;
+	}
+	
+	// Determine which cards should be discarded for a three of a kind hand.
+	public int getThreeOfAKindDiscardProbability(int cardPosition) {
+		// Find where in the hand the three of a kind is located.
+		boolean start, middle, end;
+		start = middle = end = false;
+
+		if (hand.get(0).getGameValue() == hand.get(1).getGameValue()
+				&& hand.get(1).getGameValue() == hand.get(2).getGameValue()) {
+			start = true;
+		} 
+		else if (hand.get(1).getGameValue() == hand.get(2).getGameValue()
+				&& hand.get(2).getGameValue() == hand.get(3).getGameValue()) {
+			middle = true;
+		} 
+		else if (hand.get(2).getGameValue() == hand.get(3).getGameValue()
+				&& hand.get(3).getGameValue() == hand.get(4).getGameValue()) {
+			end = true;
+		}
+		
+		// Discard the non-pair cards. This cannot ruin the three of a kind but 
+		// can only improve the hand by getting a four of a kind or full house.
+		if (start && (cardPosition == 3 || cardPosition == 4)) {
+			return 100;
+		} 
+		else if (middle && (cardPosition == 0 || cardPosition == 4)) {
+			return 100;
+		} 
+		else if (end && (cardPosition == 0 || cardPosition == 1)) {
+			return 100;
+		} 
+		else {
+			return 0;
+		}
+	}
+	
+	// Determines which cards, if any, should be discarded in a straight.
+	private int getStraightDiscardProbability(int cardPosition) {
+		// If the hand is close to a straight flush then discard the problem card.
+		String suitFrequency = countSuitFrequency();
+
+		if (suitFrequency == "D4") {
+			if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+				return (int) (1.0 / 47.0 * 100);
+			else
+				return 0;
+		}
+
+		else if (suitFrequency == "C4") {
+			if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+				return (int) (1.0 / 47.0 * 100);
+			else
+				return 0;
+		}
+
+		else if (suitFrequency == "S4") {
+			if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+				return (int) (1.0 / 47.0 * 100);
+			else
+				return 0;
+		}
+
+		else if (suitFrequency == "H4") {
+			if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+				return (int) (1.0 / 47.0 * 100);
+			else
+				return 0;
+		}
+
+		else
+			return 0;
+	}
+	
+	// Determine which cards, if any, should be discarded in a flush.
+	private int getFlushDiscardProbability(int cardPosition) {
+		// Only way to improve this hand is to get a straight flush, so check if 
+		// the hand is close to being a straight flush.
+		int straightProximity = determineProximityToStraight();
+		if (straightProximity <= 2) {
+			return findProblemCardsInBrokenStraight(cardPosition, (int)(1.0/47.0 * 100 * 3), (int)(1.0/47.0 * 1.0/46.0 * 100 * 3));
+		}
+		else return 0;
+	}
+
+	public int getDiscardProbability(int cardPosition) {
+		if (isHighHand()) {
+			return getHighHandDiscardProbability(cardPosition);
+		}
+
+		else if (isOnePair()) {
+			return getOnePairDiscardProbability(cardPosition);
+		}
+
+		else if (isTwoPair()) {
+			return getTwoPairDiscardProbability(cardPosition);
+		}
+
+		else if (isThreeOfAKind()) {
+			return getThreeOfAKindDiscardProbability(cardPosition);
+		}
+
+		else if (isStraight()) {
+			return getStraightDiscardProbability(cardPosition);
+		}
+
+		else if (isFlush()) {
+			return getFlushDiscardProbability(cardPosition);
+		}
+
+		else if (isFullHouse()) {
+			if (hand.get(4).getGameValue() == 9)
+				return (int) (1.0 / 47.0 * 100);
+			else
+				return 0;
+		}
+
+		else if (isFourOfAKind()) {
+			// Randomly (coin flip) discard the non-pair card.
+			if (hand.get(0).getGameValue() != hand.get(1).getGameValue() && cardPosition == 0) {
+				return 50;
+			} 
+			else if (hand.get(3).getGameValue() != hand.get(4).getGameValue() && cardPosition == 4) {
+				return 50;
+			} 
+			else {
+				return 0;
+			}
+		}
+
+		else if (isStraightFlush()) {
+			if (hand.get(4).getGameValue() == 9)
+				return (int) (1.0 / 47.0 * 100);
+			else
+				return 0;
+		}
+
+		else if (isRoyalFlush()) {
+			return 0;
+		}
+
+		else
+			return 0;
+	}
+
+	// Returns a string with each card in the hand separated by a space.
 	public String toString() {
 		String str = "";
 		for (int i = 0; i < HAND_SIZE; i++) {
@@ -384,19 +955,19 @@ public class HandOfCards {
 		ArrayList<PlayingCard> spades = new ArrayList<>();
 		ArrayList<PlayingCard> diamonds = new ArrayList<>();
 		ArrayList<PlayingCard> clubs = new ArrayList<>();
-		for (int i = 0; i < 52; i++) {
+		for (int i = 0; i < DeckOfCards.DECK_SIZE; i++) {
 			PlayingCard card = d.dealNext();
 			switch (card.getSuit()) {
-			case 'H':
+			case PlayingCard.HEARTS:
 				hearts.add(card);
 				break;
-			case 'S':
+			case PlayingCard.SPADES:
 				spades.add(card);
 				break;
-			case 'D':
+			case PlayingCard.DIAMONDS:
 				diamonds.add(card);
 				break;
-			case 'C':
+			case PlayingCard.CLUBS:
 				clubs.add(card);
 				break;
 			}
@@ -432,7 +1003,7 @@ public class HandOfCards {
 		 * hands. Store these hands in their own lists.
 		 */
 		ArrayList<PlayingCard> royalFlush = new ArrayList<PlayingCard>();
-		for (int i = 8; i < 13; i++) {
+		for (int i = 8; i < DeckOfCards.DECK_SIZE / DeckOfCards.NUMBER_OF_SUITS; i++) {
 			royalFlush.add(spades.get(i));
 		}
 
@@ -692,7 +1263,6 @@ public class HandOfCards {
 		System.out.println();
 		System.out.println("\n----------- Hand Value Testing -----------\n");
 
-		
 		// High hands will be tested against other high hands.
 		// Hand3 should have the highest value, followed by hand1, with hand2
 		// having the lowest value.
@@ -731,7 +1301,6 @@ public class HandOfCards {
 		hand3.hand.add(diamonds.get(0));
 		System.out.println("Hand3: " + hand3.toString() + "\nValue:" + hand3.getGameValue() + "\n");
 
-		
 		// Test hands with one pair. Hand5 should be the best hand, followed by
 		// hand4 followed by hand6.
 		System.out.println("------------------------------------------");
@@ -773,7 +1342,6 @@ public class HandOfCards {
 		hand6.sort();
 		System.out.println("Hand6: " + hand6.toString() + "\nValue:" + hand6.getGameValue() + "\n");
 
-		
 		// Test hands with two pairs. Hand7 should be worth more than hand8.
 		System.out.println("------------------------------------------");
 		System.out.println("Two Pair Tests");
@@ -802,8 +1370,8 @@ public class HandOfCards {
 		hand8.sort();
 		System.out.println("Hand8: " + hand8.toString() + "\nValue:" + hand8.getGameValue() + "\n");
 
-		
-		// Test hands with three of a kind. Hand9 should be worth more than hand10.
+		// Test hands with three of a kind. Hand9 should be worth more than
+		// hand10.
 		System.out.println("------------------------------------------");
 		System.out.println("Three of a Kind Tests");
 		System.out.println("Proposition: Hand9 > Hand10");
@@ -831,8 +1399,8 @@ public class HandOfCards {
 		hand10.sort();
 		System.out.println("Hand10: " + hand10.toString() + "\nValue:" + hand10.getGameValue() + "\n");
 
-		
-		// Test hands with four of a kind. Hand11 should be worth more than hand12.
+		// Test hands with four of a kind. Hand11 should be worth more than
+		// hand12.
 		System.out.println("------------------------------------------");
 		System.out.println("Four of a Kind Tests");
 		System.out.println("Proposition: Hand11 > Hand12");
@@ -860,7 +1428,6 @@ public class HandOfCards {
 		hand12.sort();
 		System.out.println("Hand12: " + hand12.toString() + "\nValue:" + hand12.getGameValue() + "\n");
 
-		
 		// Test hands with a straight. Hand13 should be worth more than hand14.
 		System.out.println("------------------------------------------");
 		System.out.println("Straight Tests");
@@ -889,7 +1456,6 @@ public class HandOfCards {
 		hand14.sort();
 		System.out.println("Hand14: " + hand14.toString() + "\nValue:" + hand14.getGameValue() + "\n");
 
-		
 		// Test hands with a flush. Hand16 should be worth more than hand15.
 		System.out.println("------------------------------------------");
 		System.out.println("Flush Tests");
@@ -918,7 +1484,6 @@ public class HandOfCards {
 		hand16.sort();
 		System.out.println("Hand16: " + hand16.toString() + "\nValue:" + hand16.getGameValue() + "\n");
 
-		
 		// Test hands with a full house. Hand17 should be worth more than hand18
 		System.out.println("------------------------------------------");
 		System.out.println("Full House Tests");
@@ -947,8 +1512,8 @@ public class HandOfCards {
 		hand18.sort();
 		System.out.println("Hand18: " + hand18.toString() + "\nValue:" + hand18.getGameValue() + "\n");
 
-		
-		// Test hands with a straight flush. Hand19 should be worth more than hand20
+		// Test hands with a straight flush. Hand19 should be worth more than
+		// hand20
 		System.out.println("------------------------------------------");
 		System.out.println("Straight Flush Tests");
 		System.out.println("Proposition: Hand19 > Hand20");
@@ -976,8 +1541,8 @@ public class HandOfCards {
 		hand20.sort();
 		System.out.println("Hand20: " + hand20.toString() + "\nValue:" + hand20.getGameValue() + "\n");
 
-		
-		// Test hands with a straight flush. Hand21 should be worth more than all previous hands.
+		// Test hands with a straight flush. Hand21 should be worth more than
+		// all previous hands.
 		System.out.println("------------------------------------------");
 		System.out.println("Royal Flush Tests");
 		System.out.println("Proposition: Hand21 > ALL");
@@ -993,5 +1558,337 @@ public class HandOfCards {
 		hand21.hand.add(hearts.get(8));
 		hand21.sort();
 		System.out.println("Hand21: " + hand21.toString() + "\nValue:" + hand21.getGameValue() + "\n");
+
+		// Display a break between handValue testing and discard testing.
+		System.out.println();
+		for (int i = 0; i < 6; i++) {
+			System.out.println("-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-");
+		}
+		System.out.println();
+		System.out.println("\n----------- Discard Testing -----------\n");
+
+		System.out.println("Broken ace high straight off by 1");
+		System.out.println("Card\tDiscard Probability");
+		ArrayList<Integer> probs = new ArrayList<Integer>();
+		d.reset();
+		HandOfCards handDiscard1 = new HandOfCards(d);
+		handDiscard1.hand.clear();
+		handDiscard1.hand.add(spades.get(12));
+		handDiscard1.hand.add(hearts.get(11));
+		handDiscard1.hand.add(diamonds.get(2));
+		handDiscard1.hand.add(hearts.get(9));
+		handDiscard1.hand.add(clubs.get(8));
+		handDiscard1.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard1.getDiscardProbability(i));
+			System.out.println(handDiscard1.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Broken ace low straight off by 1");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard2 = new HandOfCards(d);
+		handDiscard2.hand.clear();
+		handDiscard2.hand.add(spades.get(12));
+		handDiscard2.hand.add(hearts.get(0));
+		handDiscard2.hand.add(diamonds.get(2));
+		handDiscard2.hand.add(hearts.get(1));
+		handDiscard2.hand.add(clubs.get(8));
+		handDiscard2.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard2.getDiscardProbability(i));
+			System.out.println(handDiscard2.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Broken low straight off by 2");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard3 = new HandOfCards(d);
+		handDiscard3.hand.clear();
+		handDiscard3.hand.add(spades.get(10));
+		handDiscard3.hand.add(hearts.get(7));
+		handDiscard3.hand.add(diamonds.get(3));
+		handDiscard3.hand.add(hearts.get(1));
+		handDiscard3.hand.add(clubs.get(0));
+		handDiscard3.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard3.getDiscardProbability(i));
+			System.out.println(handDiscard3.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Broken high straight off by 2");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard4 = new HandOfCards(d);
+		handDiscard4.hand.clear();
+		handDiscard4.hand.add(spades.get(11));
+		handDiscard4.hand.add(hearts.get(9));
+		handDiscard4.hand.add(diamonds.get(7));
+		handDiscard4.hand.add(hearts.get(3));
+		handDiscard4.hand.add(clubs.get(0));
+		handDiscard4.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard4.getDiscardProbability(i));
+			System.out.println(handDiscard4.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Broken flush off by 1");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard5 = new HandOfCards(d);
+		handDiscard5.hand.clear();
+		handDiscard5.hand.add(spades.get(11));
+		handDiscard5.hand.add(spades.get(9));
+		handDiscard5.hand.add(spades.get(7));
+		handDiscard5.hand.add(spades.get(3));
+		handDiscard5.hand.add(clubs.get(0));
+		handDiscard5.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard5.getDiscardProbability(i));
+			System.out.println(handDiscard5.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Broken flush off by 2");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard6 = new HandOfCards(d);
+		handDiscard6.hand.clear();
+		handDiscard6.hand.add(spades.get(11));
+		handDiscard6.hand.add(spades.get(9));
+		handDiscard6.hand.add(spades.get(7));
+		handDiscard6.hand.add(hearts.get(3));
+		handDiscard6.hand.add(clubs.get(0));
+		handDiscard6.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard6.getDiscardProbability(i));
+			System.out.println(handDiscard6.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println(
+				"High hand which is not close to being a flush or straight. Should discard too lowest value cards.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard7 = new HandOfCards(d);
+		handDiscard7.hand.clear();
+		handDiscard7.hand.add(diamonds.get(11));
+		handDiscard7.hand.add(spades.get(9));
+		handDiscard7.hand.add(spades.get(1));
+		handDiscard7.hand.add(hearts.get(6));
+		handDiscard7.hand.add(clubs.get(0));
+		handDiscard7.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard7.getDiscardProbability(i));
+			System.out.println(handDiscard7.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("One Pair - occasionally discard the 2 least valuable, non-pair cards.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard8 = new HandOfCards(d);
+		handDiscard8.hand.clear();
+		handDiscard8.hand.add(diamonds.get(11));
+		handDiscard8.hand.add(spades.get(9));
+		handDiscard8.hand.add(spades.get(1));
+		handDiscard8.hand.add(hearts.get(0));
+		handDiscard8.hand.add(clubs.get(0));
+		handDiscard8.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard8.getDiscardProbability(i));
+			System.out.println(handDiscard8.hand.get(i) + "\t" + probs.get(i));
+		}
+		
+		System.out.println("\n");
+		System.out.println("One Pair - close to a straight");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard9 = new HandOfCards(d);
+		handDiscard9.hand.clear();
+		handDiscard9.hand.add(diamonds.get(4));
+		handDiscard9.hand.add(spades.get(3));
+		handDiscard9.hand.add(spades.get(2));
+		handDiscard9.hand.add(hearts.get(1));
+		handDiscard9.hand.add(clubs.get(1));
+		handDiscard9.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard9.getDiscardProbability(i));
+			System.out.println(handDiscard9.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Two Pair. If the kicker is below average then discard it.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard10 = new HandOfCards(d);
+		handDiscard10.hand.clear();
+		handDiscard10.hand.add(diamonds.get(11));
+		handDiscard10.hand.add(spades.get(11));
+		handDiscard10.hand.add(spades.get(1));
+		handDiscard10.hand.add(hearts.get(0));
+		handDiscard10.hand.add(clubs.get(0));
+		handDiscard10.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard10.getDiscardProbability(i));
+			System.out.println(handDiscard10.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Two Pair. If the kicker is below average then discard it.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard11 = new HandOfCards(d);
+		handDiscard11.hand.clear();
+		handDiscard11.hand.add(diamonds.get(11));
+		handDiscard11.hand.add(spades.get(1));
+		handDiscard11.hand.add(spades.get(1));
+		handDiscard11.hand.add(hearts.get(0));
+		handDiscard11.hand.add(clubs.get(0));
+		handDiscard11.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard11.getDiscardProbability(i));
+			System.out.println(handDiscard11.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Three of a Kind. Occasionally discard remaining cards.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard12 = new HandOfCards(d);
+		handDiscard12.hand.clear();
+		handDiscard12.hand.add(diamonds.get(11));
+		handDiscard12.hand.add(spades.get(1));
+		handDiscard12.hand.add(spades.get(9));
+		handDiscard12.hand.add(hearts.get(1));
+		handDiscard12.hand.add(clubs.get(1));
+		handDiscard12.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard12.getDiscardProbability(i));
+			System.out.println(handDiscard12.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Four of a Kind. Occasionally discard remaining card.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard13 = new HandOfCards(d);
+		handDiscard13.hand.clear();
+		handDiscard13.hand.add(diamonds.get(1));
+		handDiscard13.hand.add(spades.get(1));
+		handDiscard13.hand.add(spades.get(9));
+		handDiscard13.hand.add(hearts.get(1));
+		handDiscard13.hand.add(clubs.get(1));
+		handDiscard13.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard13.getDiscardProbability(i));
+			System.out.println(handDiscard13.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Straight.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard14 = new HandOfCards(d);
+		handDiscard14.hand.clear();
+		handDiscard14.hand.add(diamonds.get(1));
+		handDiscard14.hand.add(spades.get(2));
+		handDiscard14.hand.add(spades.get(3));
+		handDiscard14.hand.add(hearts.get(4));
+		handDiscard14.hand.add(clubs.get(5));
+		handDiscard14.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard14.getDiscardProbability(i));
+			System.out.println(handDiscard14.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Flush.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard15 = new HandOfCards(d);
+		handDiscard15.hand.clear();
+		handDiscard15.hand.add(diamonds.get(1));
+		handDiscard15.hand.add(diamonds.get(4));
+		handDiscard15.hand.add(diamonds.get(8));
+		handDiscard15.hand.add(diamonds.get(12));
+		handDiscard15.hand.add(diamonds.get(0));
+		handDiscard15.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard15.getDiscardProbability(i));
+			System.out.println(handDiscard15.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Full House.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard16 = new HandOfCards(d);
+		handDiscard16.hand.clear();
+		handDiscard16.hand.add(diamonds.get(1));
+		handDiscard16.hand.add(spades.get(1));
+		handDiscard16.hand.add(clubs.get(1));
+		handDiscard16.hand.add(hearts.get(9));
+		handDiscard16.hand.add(diamonds.get(9));
+		handDiscard16.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard16.getDiscardProbability(i));
+			System.out.println(handDiscard16.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Straight Flush.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard17 = new HandOfCards(d);
+		handDiscard17.hand.clear();
+		handDiscard17.hand.add(diamonds.get(1));
+		handDiscard17.hand.add(diamonds.get(2));
+		handDiscard17.hand.add(diamonds.get(3));
+		handDiscard17.hand.add(diamonds.get(4));
+		handDiscard17.hand.add(diamonds.get(5));
+		handDiscard17.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard17.getDiscardProbability(i));
+			System.out.println(handDiscard17.hand.get(i) + "\t" + probs.get(i));
+		}
+
+		System.out.println("\n");
+		System.out.println("Royal Flush.");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard18 = new HandOfCards(d);
+		handDiscard18.hand.clear();
+		handDiscard18.hand.add(diamonds.get(12));
+		handDiscard18.hand.add(diamonds.get(11));
+		handDiscard18.hand.add(diamonds.get(10));
+		handDiscard18.hand.add(diamonds.get(9));
+		handDiscard18.hand.add(diamonds.get(8));
+		handDiscard18.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard18.getDiscardProbability(i));
+			System.out.println(handDiscard18.hand.get(i) + "\t" + probs.get(i));
+		}
 	}
 }

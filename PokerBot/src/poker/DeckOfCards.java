@@ -49,16 +49,15 @@ public class DeckOfCards {
 		int suitTrack = 0;
 
 		// Create each card in the deck and add them to the deck ArrayList.
-		for (int i = 0; i < suits.length; i++) {
+		for (int i = 0; i < NUMBER_OF_SUITS; i++) {
 			char currentSuit = suits[suitTrack++];
-			for (int j = 2; j < 11; j++) {
+			for (int j = PlayingCard.TWO_GAME_VALUE; j <= PlayingCard.TEN_GAME_VALUE; j++) {
 				deck.add(new PlayingCard("" + j, currentSuit, j, j));
 			}
-
-			deck.add(new PlayingCard("J", currentSuit, 11, 11));
-			deck.add(new PlayingCard("Q", currentSuit, 12, 12));
-			deck.add(new PlayingCard("K", currentSuit, 13, 13));
-			deck.add(new PlayingCard("A", currentSuit, 1, 14));
+			deck.add(new PlayingCard("J", currentSuit, PlayingCard.JACK_GAME_VALUE, PlayingCard.JACK_GAME_VALUE));
+			deck.add(new PlayingCard("Q", currentSuit, PlayingCard.QUEEN_GAME_VALUE, PlayingCard.QUEEN_GAME_VALUE));
+			deck.add(new PlayingCard("K", currentSuit, PlayingCard.KING_GAME_VALUE, PlayingCard.KING_GAME_VALUE));
+			deck.add(new PlayingCard("A", currentSuit, 1, PlayingCard.ACE_GAME_VALUE));
 		}
 
 		shuffle();
@@ -99,7 +98,8 @@ public class DeckOfCards {
 		deck.add(card);
 	}
 	
-	private static final int DECK_SIZE = 52;
+	public static final int DECK_SIZE = 52;
+	public static final int NUMBER_OF_SUITS = 4;
 	private int numCardsDealt;
 	private List<PlayingCard> deck;
 }
