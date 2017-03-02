@@ -28,7 +28,7 @@ public class PlayingCard {
 		}
 	}
 	
-	// Magic numbers are a mark of bad design. This is good design :^)
+	// Constants are ALWAYS better than magic numbers no matter what :^)
 	public static final char DIAMONDS = 'D';
 	public static final char HEARTS = 'H';
 	public static final char SPADES = 'S';

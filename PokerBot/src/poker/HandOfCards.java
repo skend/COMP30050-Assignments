@@ -403,7 +403,9 @@ public class HandOfCards {
 	
 	// Determine how close a hand is to becoming a straight.
 	private int determineProximityToStraight() {
-		int proximity = 4;
+		// A hand which is not a straight, is at most 4 cards away from becoming a straight.
+		final int PROXIMITY_TO_STRAIGHT = 4;
+		int proximity = PROXIMITY_TO_STRAIGHT;
 		boolean containsAce = false;
 		int lastCardValue = hand.get(0).getGameValue();
 
@@ -412,13 +414,15 @@ public class HandOfCards {
 
 		// Edge case: determines if a hand is close to an ace low straight.
 		if (containsAce) {
-			if (hand.get(4).getGameValue() == 2 && hand.get(3).getGameValue() == 3 && hand.get(2).getGameValue() == 4) {
+			if (hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE && 
+					hand.get(3).getGameValue() == PlayingCard.THREE_GAME_VALUE && 
+					hand.get(2).getGameValue() == PlayingCard.FOUR_GAME_VALUE) {
 				return 1;
-			} else if (hand.get(4).getGameValue() == 2 && hand.get(3).getGameValue() == 4
-					&& hand.get(2).getGameValue() == 5) {
+			} else if (hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE && hand.get(3).getGameValue() == PlayingCard.FOUR_GAME_VALUE
+					&& hand.get(2).getGameValue() == PlayingCard.FIVE_GAME_VALUE) {
 				return 1;
-			} else if (hand.get(4).getGameValue() == 3 && hand.get(3).getGameValue() == 4
-					&& hand.get(2).getGameValue() == 5) {
+			} else if (hand.get(4).getGameValue() == PlayingCard.THREE_GAME_VALUE && hand.get(3).getGameValue() == PlayingCard.FOUR_GAME_VALUE
+					&& hand.get(2).getGameValue() == PlayingCard.FIVE_GAME_VALUE) {
 				return 1;
 			}
 		}
@@ -436,8 +440,8 @@ public class HandOfCards {
 					break;
 				else {
 					proximity++;
-					if (proximity > 4)
-						proximity = 4;
+					if (proximity > PROXIMITY_TO_STRAIGHT)
+						proximity = PROXIMITY_TO_STRAIGHT;
 				}
 			}
 			lastCardValue = hand.get(i).getGameValue();
@@ -472,13 +476,13 @@ public class HandOfCards {
 			}
 		}
 
-		if (diamondsFrequency == 4 || diamondsFrequency == 3) {
+		if (diamondsFrequency == HAND_SIZE - 1 || diamondsFrequency == HAND_SIZE - 2) {
 			return "" + PlayingCard.DIAMONDS + diamondsFrequency;
-		} else if (heartsFrequency == 4 || heartsFrequency == 3) {
+		} else if (heartsFrequency == HAND_SIZE - 1 || heartsFrequency == HAND_SIZE - 2) {
 			return "" + PlayingCard.HEARTS + heartsFrequency;
-		} else if (clubsFrequency == 4 || clubsFrequency == 3) {
+		} else if (clubsFrequency == HAND_SIZE - 1 || clubsFrequency == HAND_SIZE - 2) {
 			return "" + PlayingCard.CLUBS + clubsFrequency;
-		} else if (spadesFrequency == 4 || spadesFrequency == 3) {
+		} else if (spadesFrequency == HAND_SIZE - 1 || spadesFrequency == HAND_SIZE - 2) {
 			return "" + PlayingCard.SPADES + spadesFrequency;
 		} else
 			return null;
@@ -610,68 +614,18 @@ public class HandOfCards {
 	}
 	
 	// Method to find which cards should be discarded (if any) if the hand is a one pair.
+	// The one pair is quite a common hand to obtain or be dealt (~50% chance) so if the hand
+	// is close to a flush or straight then attempt to acquire one of these hands (even if it
+	// means discarding the pair). If the one pair cannot be upgraded to a flush or straight
+	// then discard the two lowest value non-pair cards.
 	private int getOnePairDiscardProbability(int cardPosition) {
 		int straightProximity = determineProximityToStraight();
 		String suitFrequency = countSuitFrequency();
 		
-		if (straightProximity <= 2) {
-			// If the one pair is close to straight then occasionally sacrifice the pair.
-			return findProblemCardsInBrokenStraight(cardPosition, (int)(4.0/47.0 * 100 * 3), (int)(4.0/47.0 * 4.0/46.0 * 100 * 3));
-		}
-		else if (suitFrequency != null && (suitFrequency.charAt(1) == '4' || suitFrequency.charAt(1) == '3')) {
-			if (suitFrequency != null) {
-				if (suitFrequency.equals("D4")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
-						return (int)(9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				} 
-				else if (suitFrequency.equals("D3")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
-						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				}
-
-				if (suitFrequency.equals("C4")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
-						return (int)(9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				} 
-				else if (suitFrequency.equals("C3")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
-						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				}
-
-				if (suitFrequency.equals("S4")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
-						return (int)(9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				} 
-				else if (suitFrequency.equals("S3")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
-						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				}
-
-				if (suitFrequency.equals("H4")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
-						return (int)(9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				} 
-				else if (suitFrequency.equals("H3")) {
-					if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
-						return (int)(10.0/47.0 * 9.0/47.0 * 100 * 3);
-					else
-						return 0;
-				}
-			}
+		if (straightProximity <= 2 || (suitFrequency != null && (suitFrequency.charAt(1) == '4' || suitFrequency.charAt(1) == '3'))) {
+			// If the one pair is close to straight or flush then treat the hand like a high hand
+			// and discard cards if there is a good chance of obtaining a better hand.
+			return getHighHandDiscardProbability(cardPosition);
 		}
 		else {
 			// If the one pair is not close to a straight/flush then discard the two lowest non-pair cards.
@@ -715,84 +669,19 @@ public class HandOfCards {
 			}
 			else return 0;
 		}
-		return 0;
 	}
 	
 	// Determine which cards should be discarded in a two pair. 
 	private int getTwoPairDiscardProbability(int cardPosition) {
-		String suitFrequency = countSuitFrequency();
-		// Check if it is possible to obtain a flush from the current hand. If so then determine which
-		// cards should be discarded. Return a non-zero for these cards and 0 for the remaining cards.
-		if (suitFrequency != null) {
-			if (suitFrequency.equals("D4")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
-					return (int)(9.0/47.0 * 100);
-				else
-					return 0;
-			} 
-			else if (suitFrequency.equals("D3")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
-					return (int)(10.0/47.0 * 9.0/47.0 * 100);
-				else
-					return 0;
-			}
-
-			if (suitFrequency.equals("C4")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
-					return (int)(9.0/47.0 * 100);
-				else
-					return 0;
-			} 
-			else if (suitFrequency.equals("C3")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
-					return (int)(10.0/47.0 * 9.0/47.0 * 100);
-				else
-					return 0;
-			}
-
-			if (suitFrequency.equals("S4")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
-					return (int)(9.0/47.0 * 100);
-				else
-					return 0;
-			} 
-			else if (suitFrequency.equals("S3")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
-					return (int)(10.0/47.0 * 9.0/47.0 * 100);
-				else
-					return 0;
-			}
-
-			if (suitFrequency.equals("H4")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
-					return (int)(9.0/47.0 * 100);
-				else
-					return 0;
-			} 
-			else if (suitFrequency.equals("H3")) {
-				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
-					return (int)(10.0/47.0 * 9.0/47.0 * 100);
-				else
-					return 0;
-			}
-		}
-		else {
-			// Determine whether or not to discard non-pair card.
-			int index1 = findPairStartIndex(0);
-			int index2 = findPairStartIndex(index1 + 1);
-
-			if (cardPosition != index1 && cardPosition != index1 + 1 && cardPosition != index2
-					&& cardPosition != index2 + 1) {
-				// If the non-pair card is already higher than average, don't discard it.
-				if (hand.get(cardPosition).getGameValue() < 8)
-					return 75;
-				else
-					return 0;
-			} else {
-				return 0;
-			}
-		}
-		return 0;
+		int index1 = findPairStartIndex(0);
+		int index2 = findPairStartIndex(index1 + 1);
+		
+		// Find the non-pair card and discard it.
+		if (cardPosition != index1 && cardPosition != index1 + 1 && cardPosition != index2
+				&& cardPosition != index2 + 1) {
+			return 100;
+		} 
+		else return 0;
 	}
 	
 	// Determine which cards should be discarded for a three of a kind hand.
@@ -830,51 +719,15 @@ public class HandOfCards {
 		}
 	}
 	
-	// Determines which cards, if any, should be discarded in a straight.
-	private int getStraightDiscardProbability(int cardPosition) {
-		// If the hand is close to a straight flush then discard the problem card.
-		String suitFrequency = countSuitFrequency();
-
-		if (suitFrequency == "D4") {
-			if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
-				return (int) (1.0 / 47.0 * 100);
-			else
-				return 0;
-		}
-
-		else if (suitFrequency == "C4") {
-			if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
-				return (int) (1.0 / 47.0 * 100);
-			else
-				return 0;
-		}
-
-		else if (suitFrequency == "S4") {
-			if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
-				return (int) (1.0 / 47.0 * 100);
-			else
-				return 0;
-		}
-
-		else if (suitFrequency == "H4") {
-			if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
-				return (int) (1.0 / 47.0 * 100);
-			else
-				return 0;
-		}
-
-		else
-			return 0;
-	}
-	
-	// Determine which cards, if any, should be discarded in a flush.
-	private int getFlushDiscardProbability(int cardPosition) {
-		// Only way to improve this hand is to get a straight flush, so check if 
-		// the hand is close to being a straight flush.
-		int straightProximity = determineProximityToStraight();
-		if (straightProximity <= 2) {
-			return findProblemCardsInBrokenStraight(cardPosition, (int)(1.0/47.0 * 100 * 3), (int)(1.0/47.0 * 1.0/46.0 * 100 * 3));
-		}
+	// Determine which cards (if any) should be discarded in a four of a kind hand.
+	private int getFourOfAKindDiscardProbability(int cardPosition) {
+		// Discard the non-pair card always. Not discarding a card could appear suspicious.
+		if (hand.get(0).getGameValue() != hand.get(1).getGameValue() && cardPosition == 0) {
+			return 100;
+		} 
+		else if (hand.get(3).getGameValue() != hand.get(4).getGameValue() && cardPosition == 4) {
+			return 100;
+		} 
 		else return 0;
 	}
 
@@ -896,41 +749,44 @@ public class HandOfCards {
 		}
 
 		else if (isStraight()) {
-			return getStraightDiscardProbability(cardPosition);
+			// The probability of a player holding a straight in 5 card draw is 0.76%.
+			// The odds of two player receiving this hand in a single turn is highly unlikely.
+			// Therefore I think it best that the bot/player discards nothing.
+			
+			return 0;
 		}
 
 		else if (isFlush()) {
-			return getFlushDiscardProbability(cardPosition);
+			// The probability of a player holding a flush in 5 card draw is 0.367%.
+			// The odds of two player receiving this hand in a single turn is highly unlikely.
+			// Therefore I think it best that the bot/player discards nothing.
+			
+			return 0;
 		}
 
 		else if (isFullHouse()) {
-			if (hand.get(4).getGameValue() == 9)
-				return (int) (1.0 / 47.0 * 100);
-			else
-				return 0;
+			// The probability of a player holding a full house in 5 card draw is 0.17%.
+			// The odds of two player receiving this hand in a single turn is highly unlikely.
+			// Therefore I think it best that the bot/player discards nothing.
+			
+			return 0;
 		}
 
 		else if (isFourOfAKind()) {
-			// Randomly (coin flip) discard the non-pair card.
-			if (hand.get(0).getGameValue() != hand.get(1).getGameValue() && cardPosition == 0) {
-				return 50;
-			} 
-			else if (hand.get(3).getGameValue() != hand.get(4).getGameValue() && cardPosition == 4) {
-				return 50;
-			} 
-			else {
-				return 0;
-			}
+			return getFourOfAKindDiscardProbability(cardPosition);
 		}
 
 		else if (isStraightFlush()) {
-			if (hand.get(4).getGameValue() == 9)
-				return (int) (1.0 / 47.0 * 100);
-			else
-				return 0;
+			// The probability of a player holding a straight flush in 5 card draw is 0.0256%.
+			// The odds of two player receiving this hand in a single turn is highly unlikely.
+			// Therefore I think it best that the bot/player discards nothing.
+			
+			return 0;
 		}
 
 		else if (isRoyalFlush()) {
+			// There is no better hand than this so obviously discard no cards.
+			
 			return 0;
 		}
 
