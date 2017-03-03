@@ -401,6 +401,16 @@ public class HandOfCards {
 		return -1;
 	}
 	
+	private boolean handContainsCardByGameValue(int gameValue) {
+		if (gameValue < 2 || gameValue > 14) return false;
+		for (int i = 0; i < HAND_SIZE; i++) {
+			if (hand.get(i).getGameValue() == gameValue) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
 	// Determine how close a hand is to becoming a straight.
 	private int determineProximityToStraight() {
 		// A hand which is not a straight, is at most 4 cards away from becoming a straight.
@@ -418,19 +428,22 @@ public class HandOfCards {
 					hand.get(3).getGameValue() == PlayingCard.THREE_GAME_VALUE && 
 					hand.get(2).getGameValue() == PlayingCard.FOUR_GAME_VALUE) {
 				return 1;
-			} else if (hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE && hand.get(3).getGameValue() == PlayingCard.FOUR_GAME_VALUE
+			} 
+			else if (hand.get(4).getGameValue() == PlayingCard.TWO_GAME_VALUE && hand.get(3).getGameValue() == PlayingCard.FOUR_GAME_VALUE
 					&& hand.get(2).getGameValue() == PlayingCard.FIVE_GAME_VALUE) {
 				return 1;
-			} else if (hand.get(4).getGameValue() == PlayingCard.THREE_GAME_VALUE && hand.get(3).getGameValue() == PlayingCard.FOUR_GAME_VALUE
+			} 
+			else if (hand.get(4).getGameValue() == PlayingCard.THREE_GAME_VALUE && hand.get(3).getGameValue() == PlayingCard.FOUR_GAME_VALUE
 					&& hand.get(2).getGameValue() == PlayingCard.FIVE_GAME_VALUE) {
 				return 1;
 			}
 		}
-
+		
 		for (int i = 1; i < HAND_SIZE; i++) {
 			if (findCardIndexInHandByGameValue(lastCardValue - 1, i) != -1) {
 				proximity--;
-			} else {
+			} 
+			else {
 				if (findCardIndexInHandByGameValue(lastCardValue - 2, i) != -1) {
 					proximity--;
 				}
@@ -445,6 +458,15 @@ public class HandOfCards {
 				}
 			}
 			lastCardValue = hand.get(i).getGameValue();
+		}
+		
+		// Check for 3 off straight.
+		if (proximity > 2) {
+			for (int i = 0; i < HAND_SIZE; i++) {
+				for (int a = -4; a < 5; a++) {
+					if (handContainsCardByGameValue(hand.get(i).getGameValue() + a)) return 3;
+				}
+			}
 		}
 
 		return proximity;
@@ -476,21 +498,26 @@ public class HandOfCards {
 			}
 		}
 
-		if (diamondsFrequency == HAND_SIZE - 1 || diamondsFrequency == HAND_SIZE - 2) {
+		if (diamondsFrequency == HAND_SIZE - 1 || diamondsFrequency == HAND_SIZE - 2 || diamondsFrequency == HAND_SIZE - 3) {
 			return "" + PlayingCard.DIAMONDS + diamondsFrequency;
-		} else if (heartsFrequency == HAND_SIZE - 1 || heartsFrequency == HAND_SIZE - 2) {
+		} 
+		else if (heartsFrequency == HAND_SIZE - 1 || heartsFrequency == HAND_SIZE - 2 || heartsFrequency == HAND_SIZE - 3) {
 			return "" + PlayingCard.HEARTS + heartsFrequency;
-		} else if (clubsFrequency == HAND_SIZE - 1 || clubsFrequency == HAND_SIZE - 2) {
+		} 
+		else if (clubsFrequency == HAND_SIZE - 1 || clubsFrequency == HAND_SIZE - 2 || clubsFrequency == HAND_SIZE - 3) {
 			return "" + PlayingCard.CLUBS + clubsFrequency;
-		} else if (spadesFrequency == HAND_SIZE - 1 || spadesFrequency == HAND_SIZE - 2) {
+		} 
+		else if (spadesFrequency == HAND_SIZE - 1 || spadesFrequency == HAND_SIZE - 2 || spadesFrequency == HAND_SIZE - 3) {
 			return "" + PlayingCard.SPADES + spadesFrequency;
-		} else
+		} 
+		else
 			return null;
 	}
 	
 	// Find which cards should be discarded in a broken straight.
 	// If the broken straight is one off a straight then the problem card should receive the oneOffProbability.
 	// If the broken straight is two off a straight then the problem card should receive the twoOffProbability.
+	// A broken straight which is three off a straight is too unlikely to be obtained by trading in 3 cards.
 	private int findProblemCardsInBrokenStraight(int cardPosition, int oneOffProbability, int twoOffProbability) {
 		int straightProximity = determineProximityToStraight();
 		if (straightProximity <= 2) {
@@ -510,7 +537,8 @@ public class HandOfCards {
 					return oneOffProbability;
 				else
 					return 0;
-			} else if (straightProximity == 2) {
+			} 
+			else if (straightProximity == 2) {
 				int firstHalfOfHandDifference = hand.get(0).getGameValue() - hand.get(1).getGameValue()
 						+ hand.get(1).getGameValue() - hand.get(2).getGameValue();
 				int secondHalfOfHandDifference = hand.get(2).getGameValue() - hand.get(3).getGameValue()
@@ -537,67 +565,90 @@ public class HandOfCards {
 	private int getHighHandDiscardProbability(int cardPosition) {
 		// High hand doesn't calculate odds of getting a better hand since the player should always attempt to obtain one.
 		String suitFrequency = countSuitFrequency();
+		int straightProximity = determineProximityToStraight();
 		
 		// Check if it is possible to obtain a flush from the current hand. If so then determine which
 		// cards should be discarded. Return a non-zero for these cards and 0 for the remaining cards.
 		if (suitFrequency != null) {
 			if (suitFrequency.equals("D4")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
-					return 85;
+					return 100;
 				else
 					return 0;
 			} 
 			else if (suitFrequency.equals("D3")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
-					return 55;
+					return 50;
+				else
+					return 0;
+			}
+			else if (suitFrequency.equals("D2") && straightProximity > 2) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.DIAMONDS)
+					return 33;
 				else
 					return 0;
 			}
 
 			if (suitFrequency.equals("C4")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
-					return 85;
+					return 100;
 				else
 					return 0;
 			} 
 			else if (suitFrequency.equals("C3")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
-					return 55;
+					return 50;
+				else
+					return 0;
+			}
+			else if (suitFrequency.equals("C2") && straightProximity > 2) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.CLUBS)
+					return 33;
 				else
 					return 0;
 			}
 
 			if (suitFrequency.equals("S4")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
-					return 85;
+					return 100;
 				else
 					return 0;
 			} 
 			else if (suitFrequency.equals("S3")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
-					return 55;
+					return 50;
+				else
+					return 0;
+			}
+			else if (suitFrequency.equals("S2") && straightProximity > 2) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.SPADES)
+					return 33;
 				else
 					return 0;
 			}
 
 			if (suitFrequency.equals("H4")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
-					return 85;
+					return 100;
 				else
 					return 0;
 			} 
 			else if (suitFrequency.equals("H3")) {
 				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
-					return 55;
+					return 50;
+				else
+					return 0;
+			}
+			else if (suitFrequency.equals("H2") && straightProximity > 2) {
+				if (hand.get(cardPosition).getSuit() != PlayingCard.HEARTS)
+					return 33;
 				else
 					return 0;
 			}
 		}
 		
-		
 		// Determine whether it is possible to obtain a straight from the current hand. If it is possible
 		// find the cards which should be discarded. Return a non-zero for these cards and zero for the other cards. 
-		int straightProximity = determineProximityToStraight();
 		if (straightProximity <= 2) {
 			// Not using calculations because a player with a high hand should 'always' go for something better.
 			return findProblemCardsInBrokenStraight(cardPosition, 80, 50);
@@ -605,11 +656,11 @@ public class HandOfCards {
 		else {
 			// If the hand is not close to a straight or a flush then discard the two lowest cards.
 			if (cardPosition == 3)
-				return 60;
+				return 50;
 			if (cardPosition == 4)
-				return 90;
+				return 50;
 		}
-
+		
 		return 0;
 	}
 	
@@ -634,36 +685,60 @@ public class HandOfCards {
 			if (index == 0) {
 				if (cardPosition == 4) {
 					return 75;
-				} else if (cardPosition == 3) {
+				} 
+				else if (cardPosition == 3) {
 					return 50;
-				} else {
+				} 
+				else if (cardPosition == 2 && hand.get(2).getGameValue() < 8) {
+					// If the highest value card in your hand is less than average discard that too.
+					return 100;
+				}
+				else {
 					return 0;
 				}
 			} 
 			else if (index == 1) {
 				if (cardPosition == 4) {
 					return 75;
-				} else if (cardPosition == 3) {
+				} 
+				else if (cardPosition == 3) {
 					return 50;
-				} else {
+				} 
+				else if (cardPosition == 2 && hand.get(2).getGameValue() < 8) {
+					// If the highest value card in your hand is less than average discard that too.
+					return 100;
+				}
+				else {
 					return 0;
 				}
 			} 
 			else if (index == 2) {
 				if (cardPosition == 4) {
 					return 75;
-				} else if (cardPosition == 1) {
+				} 
+				else if (cardPosition == 1) {
 					return 50;
-				} else {
+				} 
+				else if (cardPosition == 2 && hand.get(2).getGameValue() < 8) {
+					// If the highest value card in your hand is less than average discard that too.
+					return 100;
+				}
+				else {
 					return 0;
 				}
 			} 
 			else if (index == 3) {
 				if (cardPosition == 2) {
 					return 75;
-				} else if (cardPosition == 1) {
+				} 
+				else if (cardPosition == 1) {
 					return 50;
-				} else {
+				} 
+				else if (cardPosition == 2 && hand.get(2).getGameValue() < 8) {
+					// If the highest value card in your hand is less than average discard that too.
+					return 100;
+				}
+				else {
 					return 0;
 				}
 			}
@@ -1531,8 +1606,7 @@ public class HandOfCards {
 		}
 
 		System.out.println("\n");
-		System.out.println(
-				"High hand which is not close to being a flush or straight. Should discard too lowest value cards.");
+		System.out.println("Broken straight/flush off by 3. Should prioritise flush.");
 		System.out.println("Card\tDiscard Probability");
 		probs.clear();
 		d.reset();
@@ -1745,6 +1819,24 @@ public class HandOfCards {
 		for (int i = 0; i < HAND_SIZE; i++) {
 			probs.add(handDiscard18.getDiscardProbability(i));
 			System.out.println(handDiscard18.hand.get(i) + "\t" + probs.get(i));
+		}
+		
+		System.out.println("\n");
+		System.out.println("Three off Flush");
+		System.out.println("Card\tDiscard Probability");
+		probs.clear();
+		d.reset();
+		HandOfCards handDiscard19 = new HandOfCards(d);
+		handDiscard19.hand.clear();
+		handDiscard19.hand.add(diamonds.get(12));
+		handDiscard19.hand.add(diamonds.get(10));
+		handDiscard19.hand.add(hearts.get(6));
+		handDiscard19.hand.add(clubs.get(3));
+		handDiscard19.hand.add(spades.get(0));
+		handDiscard19.sort();
+		for (int i = 0; i < HAND_SIZE; i++) {
+			probs.add(handDiscard19.getDiscardProbability(i));
+			System.out.println(handDiscard19.hand.get(i) + "\t" + probs.get(i));
 		}
 	}
 }
